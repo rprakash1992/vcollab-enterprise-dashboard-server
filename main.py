@@ -7,7 +7,9 @@ from zipfile import ZipFile
 import uuid
 import json
 import os
+import resend
 from dotenv import load_dotenv
+from supabase import create_client, Client
 
 load_dotenv()
 
@@ -19,6 +21,22 @@ class FileUrlData(BaseModel):
 
 class FolderUrlData(BaseModel):
     folderUrl: str
+
+class RegisterRequestMailData(BaseModel):
+    name: str
+    email: str
+
+class SignUpData(BaseModel):
+    email: str
+    password: str
+
+class RegisterConfirmationMainData(BaseModel):
+    email: str
+    type: str
+
+class UserProfileData(BaseModel):
+    name: str
+    email: str
 
 app = FastAPI()
 
@@ -48,6 +66,14 @@ lambda_client = boto3.client(
     aws_secret_access_key = my_secret_key,
     region_name="us-east-1"
 )
+
+supabase_url: str = os.getenv("SUPABASE_URL")
+supabase_key: str = os.getenv("SUPABASE_KEY")
+service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+supabase: Client = create_client(supabase_url, supabase_key)
+supabase_admin = create_client(supabase_url, service_role_key)
+
+resend.api_key = os.getenv("RESEND_ACCESS_KEY")
 
 @app.post("/upload-normal-file")
 def upload_normal_file(file: UploadFile):
@@ -252,6 +278,152 @@ def delete_folder_from_zip(data: FolderUrlData):
             "success": False,
             "errorMessage": str(e)
         }
+    
+@app.post("/register-request-emails")
+def register_request_main_to_admin(data: RegisterRequestMailData):
+    name = data.name
+    email = data.email
+
+    params_to_admin: resend.Emails.SendParams = {
+        "from": "info@vcollab.ai",
+        "to": ["ravi.prakash@vcollab.com", "rprakash262@gmail.com"],
+        "subject": "New Register Request: Vcollab Dashboard",
+        "html": f"<p>A new register request has been received at VCollab Dashboard App from the below credentials:</p><br /><strong>Name: </strong> {name} <br /><strong>Email: </strong> {email}<br /><br /> Please visit the admin panel to approve or reject the user.",
+    }
+
+    params_to_user: resend.Emails.SendParams = {
+        "from": "info@vcollab.ai",
+        "to": email,
+        "subject": "Register Request: Vcollab Dashboard",
+        "html": f"<p>Thank you for registering at VCollab Dashboard App. You will be able to login once your request is approved by the admin.",
+    }
+    
+    try:
+        response_from_admin: resend.Email = resend.Emails.send(params_to_admin)
+        response_from_user: resend.Email = resend.Emails.send(params_to_user)
+
+        if response_from_admin["id"] and response_from_user["id"]:
+            return {
+                "success": True,
+                "message": "Email sent successfully.",
+                "data": None
+            }
+        else:
+            return {
+                "success": False,
+                "errorMessage": "Something went wrong.",
+            }
+    except Exception as e:
+        print(e)
+        return {
+            "success": False,
+            "errorMessage": str(e)
+        }
+    
+@app.post("/sign-up-user")
+def sign_up_user(data: SignUpData):
+    email = data.email
+    password = data.password
+
+    try:
+        response = supabase.auth.sign_up(
+            credentials={
+                "email": email,
+                "password": password,
+                "options": {
+                    "email_redirect_to": "https://dev.vcollab.ai/confirm-email"
+                }
+            }
+        )
+
+        if response.user.id:
+            return {
+                "success": True,
+                "message": "User created successfully",
+                "data": str(response.user.id)
+            }
+        else:
+            return {
+                "success": False,
+                "errorMessage": "Something went wrong",
+            }
+    except Exception as e:
+        print(e)
+        return {
+            "success": False,
+            "errorMessage": str(e)
+        }
+    
+@app.post("/register-confirmation-mail-to-user")
+def register_confirmation_mail_to_user(data: RegisterConfirmationMainData):
+    email = data.email
+    type = data.type
+
+    htmlText = "<p>Your request for registration at VCollab Dashboard App has been declined by the admin. Please contact admin for more details."
+
+    if type == "approve":
+        htmlText = "<p>Your request for registration at VCollab Dashboard App has been approved. You may login with your credentials now."
+
+
+    params: resend.Emails.SendParams = {
+        "from": "info@vcollab.ai",
+        "to": [email],
+        "subject": "Register Request as Vcollab App",
+        "html": htmlText,
+    }
+
+    try:
+        response: resend.Email = resend.Emails.send(params)
+
+        if response["id"]:
+            return {
+                "success": True,
+                "message": "Email sent successfully.",
+                "data": None
+            }
+        else:
+            return {
+                "success": False,
+                "errorMessage": "Something went wrong.",
+            }
+    except Exception as e:
+        print(e)
+        return {
+            "success": False,
+            "errorMessage": str(e)
+        }
+    
+@app.post("/create-user-profile")
+def create_user_profile(data: UserProfileData):
+    name = data.name
+    email = data.email
+    req_user = None
+
+    try:
+        users_list = supabase_admin.auth.admin.list_users()
+
+        for user in users_list:
+            if user.email == email:
+                req_user = user
+
+        response = (
+            supabase.table("profiles")
+            .insert({"id": req_user.id, "name": name, "email": email})
+            .execute()
+        )
+
+        return {
+            "success": True,
+            "message": "Profile created successfully",
+            "data": None
+        }
+    except Exception as e:
+        print(e)
+        return {
+            "success": False,
+            "errorMessage": str(e)
+        }
+    
 
 def fetch(key_name, start, len):
     """
