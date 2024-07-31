@@ -29,4 +29,6 @@ archive.zip
 # macOS
 .DS_Store
 
-main2.py
+main-for-aws.py
+
+oci-functions
