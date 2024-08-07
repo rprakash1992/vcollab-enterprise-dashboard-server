@@ -2,6 +2,7 @@ from fastapi import FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from io import BytesIO
+from typing import List
 from zipfile import ZipFile
 import uuid
 import json
@@ -57,9 +58,22 @@ class UserProfileData(BaseModel):
     name: str
     email: str
 
-class TestData(BaseModel):
-    key: str
-    required_file: str
+class InvitationEmailData(BaseModel):
+    email: str
+    itemName: str
+    itemType: str
+
+class InvitedItemsObject(BaseModel):
+    itemId: int
+    invitedBy: str
+    role: int
+
+class InvitedUsersData(BaseModel):
+    email: str
+    invitedItems: List[InvitedItemsObject]
+
+class EmailData(BaseModel):
+    email: str
 
 oracle_bucket = os.getenv("ORACLE_BUCKET")
 oracle_namespace = os.getenv("ORACLE_NAMESPACE")
@@ -191,6 +205,7 @@ def upload_zip_file(file: UploadFile):
             if f_name[len(f_name) - 1] == "/":
                 f_name = f_name[:len(f_name) - 1]
                 file_names_list.append(f_name)
+            # elif f_name.index("/")
             else:
                 file_names_list.append(f_name)
 
@@ -455,15 +470,15 @@ def register_request_main_to_admin(data: RegisterRequestMailData):
 
     params_to_admin: resend.Emails.SendParams = {
         "from": "info@vcollab.ai",
-        "to": ["ravi.prakash@vcollab.com", "mohan@vcollab.com"],
-        "subject": "New Register Request: Vcollab Dashboard",
-        "html": f"<p>A new register request has been received at VCollab Dashboard App from the below credentials:</p><br /><strong>Name: </strong> {name} <br /><strong>Email: </strong> {email}<br /><br /> Please visit the admin panel to approve or reject the user.",
+        "to": ["ravi.prakash@vcollab.com", "mohan@vcollab.com", "srinivasamurthi@vcollab.com"],
+        "subject": "New Register Request: Vcollab Dashboard App",
+        "html": f"<p>A new register request has been received at VCollab Dashboard App from the below credentials:</p><br /><strong>Name: </strong> {name} <br /><strong>Email: </strong> {email}<br /><br /> Please visit the admin panel to approve or reject the user.<br /> <a href='https://dev.vcollab.ai/login' target='_blank'>dev.vcollab.ai<a/>",
     }
 
     params_to_user: resend.Emails.SendParams = {
         "from": "info@vcollab.ai",
         "to": email,
-        "subject": "Register Request: Vcollab Dashboard",
+        "subject": "Register Request: Vcollab Dashboard App",
         "html": f"<p>Thank you for registering at VCollab Dashboard App. You will be able to login once your request is approved by the admin.",
     }
     
@@ -537,7 +552,7 @@ def register_confirmation_mail_to_user(data: RegisterConfirmationMainData):
     params: resend.Emails.SendParams = {
         "from": "info@vcollab.ai",
         "to": [email],
-        "subject": "Register Request as Vcollab App",
+        "subject": "Register Request: Vcollab Dashboard App",
         "html": htmlText,
     }
 
@@ -592,6 +607,108 @@ def create_user_profile(data: UserProfileData):
             "success": False,
             "errorMessage": str(e)
         }
+
+@app.post("/send-invitation-email")
+def send_invitation_email(data: InvitationEmailData):
+    email = data.email
+    item_name = data.itemName
+    item_type = data.itemType
+
+    htmlText = f"<div><p>You have been invited to access a {item_type} '{item_name}' at VCollab Dashboard App.</p><br /><br /><a href='http://dev.vcollab.ai/register' target='_blank'>Please visit this link to register.</a></div>"
+
+    params: resend.Emails.SendParams = {
+        "from": "info@vcollab.ai",
+        "to": [email],
+        "subject": "Invitation: Vcollab Dashboard App",
+        "html": htmlText,
+    }
+
+    try:
+        response: resend.Email = resend.Emails.send(params)
+
+        if response["id"]:
+            return {
+                "success": True,
+                "message": "Email sent successfully.",
+                "data": None
+            }
+        else:
+            return {
+                "success": False,
+                "errorMessage": "Something went wrong.",
+            }
+    except Exception as e:
+        print(e)
+        return {
+            "success": False,
+            "errorMessage": str(e)
+        }
+    
+@app.post("/get-user-id-from-email")
+def get_user_id_from_email(data: EmailData):
+    email = data.email
+    
+    try:
+        req_user = ""
+        users_list = supabase_admin.auth.admin.list_users()
+
+        for user in users_list:
+            if user.email == email:
+                req_user = user
+
+        return {
+            "success": True,
+            "message": "",
+            "data": req_user.id
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "errorMessage": str(e)
+        }
+    
+@app.post("/add-item-users-for-invited-users")
+def add_item_users_for_invited_users(data: InvitedUsersData):
+    print(data)
+    invitedItems = data.invitedItems
+    email = data.email
+    item_users_payload = []
+    req_user = {}
+
+    users_list = supabase_admin.auth.admin.list_users()
+
+    for user in users_list:
+        if user.email == email:
+            req_user = user
+
+    for item in invitedItems:
+        one_item_user = {
+            "item_id": item.itemId,
+            "user_id": req_user.id,
+            "user_role_id": item.role
+        }
+        item_users_payload.append(one_item_user)
+    
+    print(item_users_payload)
+
+    try:
+        response = (
+            supabase.table("item_users")
+                .insert(item_users_payload)
+                .execute()
+        )
+
+        return {
+            "success": True,
+            "message": "Items added to item users table successfully.",
+            "data": None
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "errorMessage": str(e)
+        }
+    
 
 def fetch(key_name, start, len):
     """
