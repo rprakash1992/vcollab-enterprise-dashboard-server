@@ -504,39 +504,6 @@ def register_request_main_to_admin(data: RegisterRequestMailData):
             "errorMessage": str(e)
         }
     
-@app.post("/register-request-email-to-admin")
-def register_request_main_to_admin(data: RegisterRequestMailData):
-    name = data.name
-    email = data.email
-
-    params: resend.Emails.SendParams = {
-        "from": "info@vcollab.ai",
-        "to": ["ravi.prakash@vcollab.com"],
-        "subject": "New Register Request: Vcollab Dashboard App",
-        "html": f"<p>A new register request has been received at VCollab Dashboard App from the below mentioned credentials:</p><br /><strong>Name: </strong> {name} <br /><strong>Email: </strong> {email}<br /><br /> Please visit the admin panel to approve or reject the user.<br /> <a href='https://dev.vcollab.ai/login' target='_blank'>dev.vcollab.ai<a/>",
-    }
-    
-    try:
-        response: resend.Email = resend.Emails.send(params)
-
-        if response["id"]:
-            return {
-                "success": True,
-                "message": "Email sent successfully.",
-                "data": None
-            }
-        else:
-            return {
-                "success": False,
-                "errorMessage": "Something went wrong.",
-            }
-    except Exception as e:
-        print(e)
-        return {
-            "success": False,
-            "errorMessage": str(e)
-        }
-    
 @app.post("/sign-up-user")
 def sign_up_user(data: SignUpData):
     email = data.email
