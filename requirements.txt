@@ -4,3 +4,5 @@ uvicorn
 supabase
 resend
 oci
+python-dotenv
+python-multipart
