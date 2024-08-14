@@ -481,7 +481,7 @@ def register_request_mail_to_admin(data: RegisterRequestMailData):
     try:
         params: resend.Emails.SendParams = {
             "from": "info@vcollab.ai",
-            "to": ["ravi.prakash@vcollab.com"],
+            "to": ["ravi.prakash@vcollab.com", "mohan@vcollab.com", "srinivasamurthi@vcollab.com"],
             "subject": "New Register Request: VCollab Dashboard App",
             "html": f"<p>A new register request has been received at VCollab Dashboard App from the below credentials:</p><br /><strong>Name: </strong> {name} <br /><strong>Email: </strong> {email}<br /><br /> Please visit the admin panel to approve or reject the user.<br /> <a href='https://dev.vcollab.ai/login' target='_blank'>dev.vcollab.ai<a/>",
         }
