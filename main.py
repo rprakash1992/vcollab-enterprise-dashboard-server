@@ -50,6 +50,16 @@ class SignUpData(BaseModel):
     email: str
     password: str
 
+class RegisterNewUserData(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class EmailVerifyData(BaseModel):
+    name: str
+    email: str
+    userId: str
+
 class RegisterConfirmationMainData(BaseModel):
     email: str
     type: str
@@ -463,33 +473,25 @@ def delete_folder_from_zip(data: FolderUrlData):
             "errorMessage": str(e)
         }
     
-@app.post("/register-request-emails")
-def register_request_main_to_admin(data: RegisterRequestMailData):
+@app.post("/new-register-request-mail-to-admin")
+def register_request_mail_to_admin(data: RegisterRequestMailData):
     name = data.name
     email = data.email
-
-    params_to_admin: resend.Emails.SendParams = {
-        "from": "info@vcollab.ai",
-        "to": ["ravi.prakash@vcollab.com", "mohan@vcollab.com", "srinivasamurthi@vcollab.com"],
-        "subject": "New Register Request: Vcollab Dashboard App",
-        "html": f"<p>A new register request has been received at VCollab Dashboard App from the below credentials:</p><br /><strong>Name: </strong> {name} <br /><strong>Email: </strong> {email}<br /><br /> Please visit the admin panel to approve or reject the user.<br /> <a href='https://dev.vcollab.ai/login' target='_blank'>dev.vcollab.ai<a/>",
-    }
-
-    params_to_user: resend.Emails.SendParams = {
-        "from": "info@vcollab.ai",
-        "to": email,
-        "subject": "Register Request: Vcollab Dashboard App",
-        "html": f"<p>Thank you for registering at VCollab Dashboard App. You will be able to login once your request is approved by the admin.",
-    }
     
     try:
-        response_from_admin: resend.Email = resend.Emails.send(params_to_admin)
-        response_from_user: resend.Email = resend.Emails.send(params_to_user)
+        params: resend.Emails.SendParams = {
+            "from": "info@vcollab.ai",
+            "to": ["ravi.prakash@vcollab.com"],
+            "subject": "New Register Request: VCollab Dashboard App",
+            "html": f"<p>A new register request has been received at VCollab Dashboard App from the below credentials:</p><br /><strong>Name: </strong> {name} <br /><strong>Email: </strong> {email}<br /><br /> Please visit the admin panel to approve or reject the user.<br /> <a href='https://dev.vcollab.ai/login' target='_blank'>dev.vcollab.ai<a/>",
+        }
+        
+        response: resend.Email = resend.Emails.send(params)
 
-        if response_from_admin["id"] and response_from_user["id"]:
+        if response["id"]:
             return {
                 "success": True,
-                "message": "Email sent successfully.",
+                "message": "Email sent to admin successfully.",
                 "data": None
             }
         else:
@@ -497,47 +499,14 @@ def register_request_main_to_admin(data: RegisterRequestMailData):
                 "success": False,
                 "errorMessage": "Something went wrong.",
             }
+
     except Exception as e:
         print(e)
         return {
             "success": False,
             "errorMessage": str(e)
         }
-    
-@app.post("/sign-up-user")
-def sign_up_user(data: SignUpData):
-    email = data.email
-    password = data.password
-
-    try:
-        response = supabase.auth.sign_up(
-            credentials={
-                "email": email,
-                "password": password,
-                "options": {
-                    "email_redirect_to": "https://dev.vcollab.ai/confirm-email"
-                }
-            }
-        )
-
-        if response.user.id:
-            return {
-                "success": True,
-                "message": "User created successfully",
-                "data": str(response.user.id)
-            }
-        else:
-            return {
-                "success": False,
-                "errorMessage": "Something went wrong",
-            }
-    except Exception as e:
-        print(e)
-        return {
-            "success": False,
-            "errorMessage": str(e)
-        }
-    
+  
 @app.post("/register-confirmation-mail-to-user")
 def register_confirmation_mail_to_user(data: RegisterConfirmationMainData):
     email = data.email
@@ -577,36 +546,6 @@ def register_confirmation_mail_to_user(data: RegisterConfirmationMainData):
             "errorMessage": str(e)
         }
     
-@app.post("/create-user-profile")
-def create_user_profile(data: UserProfileData):
-    name = data.name
-    email = data.email
-    req_user = None
-
-    try:
-        users_list = supabase_admin.auth.admin.list_users()
-
-        for user in users_list:
-            if user.email == email:
-                req_user = user
-
-        response = (
-            supabase.table("profiles")
-            .insert({"id": req_user.id, "name": name, "email": email})
-            .execute()
-        )
-
-        return {
-            "success": True,
-            "message": "Profile created successfully",
-            "data": None
-        }
-    except Exception as e:
-        print(e)
-        return {
-            "success": False,
-            "errorMessage": str(e)
-        }
 
 @app.post("/send-invitation-email")
 def send_invitation_email(data: InvitationEmailData):
@@ -666,49 +605,6 @@ def get_user_id_from_email(data: EmailData):
             "success": False,
             "errorMessage": str(e)
         }
-    
-@app.post("/add-item-users-for-invited-users")
-def add_item_users_for_invited_users(data: InvitedUsersData):
-    print(data)
-    invitedItems = data.invitedItems
-    email = data.email
-    item_users_payload = []
-    req_user = {}
-
-    users_list = supabase_admin.auth.admin.list_users()
-
-    for user in users_list:
-        if user.email == email:
-            req_user = user
-
-    for item in invitedItems:
-        one_item_user = {
-            "item_id": item.itemId,
-            "user_id": req_user.id,
-            "user_role_id": item.role
-        }
-        item_users_payload.append(one_item_user)
-    
-    print(item_users_payload)
-
-    try:
-        response = (
-            supabase.table("item_users")
-                .insert(item_users_payload)
-                .execute()
-        )
-
-        return {
-            "success": True,
-            "message": "Items added to item users table successfully.",
-            "data": None
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "errorMessage": str(e)
-        }
-    
 
 def fetch(key_name, start, len):
     """
