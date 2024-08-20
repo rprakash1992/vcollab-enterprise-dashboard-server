@@ -62,6 +62,7 @@ class EmailVerifyData(BaseModel):
 
 class RegisterConfirmationMainData(BaseModel):
     email: str
+    name: str
     type: str
 
 class UserProfileData(BaseModel):
@@ -473,25 +474,47 @@ def delete_folder_from_zip(data: FolderUrlData):
             "errorMessage": str(e)
         }
     
-@app.post("/new-register-request-mail-to-admin")
+@app.post("/send-emails-after-email-verification")
 def register_request_mail_to_admin(data: RegisterRequestMailData):
     name = data.name
     email = data.email
     
+    paramsToAdmin: resend.Emails.SendParams = {
+        "from": "info@vcollab.ai",
+        # "to": ["ravi.prakash@vcollab.com", "mohan@vcollab.com", "srinivasamurthi@vcollab.com"],
+        "to": ["ravi.prakash@vcollab.com"],
+        "subject": "VCollab Dashboard App: New Registration Request",
+        "html": f"""<div><p><b>Dear Administrator,</b></p>
+<br />
+<p>A new user has registered on VCollab Dashboard App. Here are the details of the new user:</p>
+<p><b>Name: {name}</b></p>
+<p><b>Email: {email}</b></p>
+<br />
+<p>Kindly review the user’s profile and take any necessary administrative actions by visiting the admin panel.</p>
+<p><a href='https://dev.vcollab.ai/admin' target='_blank'>Click here to visit Admin Panel</a></p></div>"""
+    }
+    
+    paramsToUser: resend.Emails.SendParams = {
+        "from": "info@vcollab.ai",
+        "to": [email],
+        "subject": "VCollab Dashboard App: Email Successfully Verified!",
+        "html": f"""<div><p><b>Dear {name},</b></p>
+<br />
+<p>Congratulations! Your email address has been successfully verified.</p>
+<p>Your profile is currently reviewed by the admin. You can access your account once it is approved by the admin.</p>
+<br />
+<p>Best regards,</p>
+<p>VCollab Dashboard Team</p><div>"""
+    }
+    
     try:
-        params: resend.Emails.SendParams = {
-            "from": "info@vcollab.ai",
-            "to": ["ravi.prakash@vcollab.com", "mohan@vcollab.com", "srinivasamurthi@vcollab.com"],
-            "subject": "New Register Request: VCollab Dashboard App",
-            "html": f"<p>A new register request has been received at VCollab Dashboard App from the below credentials:</p><br /><strong>Name: </strong> {name} <br /><strong>Email: </strong> {email}<br /><br /> Please visit the admin panel to approve or reject the user.<br /> <a href='https://dev.vcollab.ai/login' target='_blank'>dev.vcollab.ai<a/>",
-        }
-        
-        response: resend.Email = resend.Emails.send(params)
+        responseFromAdmin: resend.Email = resend.Emails.send(paramsToAdmin)
+        responseFromUser: resend.Email = resend.Emails.send(paramsToUser)
 
-        if response["id"]:
+        if responseFromAdmin["id"] and responseFromUser["id"]:
             return {
                 "success": True,
-                "message": "Email sent to admin successfully.",
+                "message": "Email sent successfully.",
                 "data": None
             }
         else:
@@ -510,18 +533,37 @@ def register_request_mail_to_admin(data: RegisterRequestMailData):
 @app.post("/register-confirmation-mail-to-user")
 def register_confirmation_mail_to_user(data: RegisterConfirmationMainData):
     email = data.email
+    name = data.name
     type = data.type
 
-    htmlText = "<p>Your request for registration at VCollab Dashboard App has been declined by the admin. Please contact admin for more details."
-
+    htmlText = f"""<div><p><b>Dear {name},</b></p>
+<br />
+<p>Thank you for your interest in joining VCollab Dashboard App.</p>
+<p>After reviewing your registration, we regret to inform you that your account could not be approved at this time.</p> 
+<p>Thank you for your understanding, and we appreciate your interest in VCollab Dashboard App.</p>
+<br />
+<p>Best regards,</p>
+<p>VCollab Dashboard Team</p>
+<div>"""
+    subject = "VCollab Dashboard App: Account Rejected!"
+    
     if type == "approve":
-        htmlText = "<div><p>Your request for registration at VCollab Dashboard App has been approved. You may login with your credentials now.</p><br /><a href='https://dev.vcollab.ai/login' target='_blank'>Click here to visit VCollab Dashboard</a><div>"
-
+        htmlText = f"""<div><p><b>Dear {name},</b></p>
+<br />
+<p>We are excited to inform you that your registration request on VCollab Dashboard App has been successfully approved by the admin.</p>
+<p>You may login with your credentials now by visiting the link below.</p>
+<p><a href='https://dev.vcollab.ai/login' target='_blank'>Click here to Login</a></p>
+<p>Welcome aboard, and enjoy your journey with us!</p>
+<br />
+<p>Best regards,</p>
+<p>VCollab Dashboard Team</p>
+<div>"""
+        subject = "VCollab Dashboard App: Account Approved!"
 
     params: resend.Emails.SendParams = {
         "from": "info@vcollab.ai",
         "to": [email],
-        "subject": "Register Request: Vcollab Dashboard App",
+        "subject": subject,
         "html": htmlText,
     }
 
@@ -553,7 +595,15 @@ def send_invitation_email(data: InvitationEmailData):
     item_name = data.itemName
     item_type = data.itemType
 
-    htmlText = f"<div><p>You have been invited to access a {item_type} '{item_name}' at VCollab Dashboard App.</p><br /><br /><a href='http://dev.vcollab.ai/register' target='_blank'>Please visit this link to register.</a></div>"
+    htmlText = f"""<div><p><b>Dear user,</b></p>
+<br />
+<p>You have been invited to access a {item_type}, <b>'{item_name}'</b> at VCollab Dashboard App.</p>
+<p>Please register at VCollab Dashboard App to access the {item_type}.<p>
+<p><a href='http://dev.vcollab.ai/register' target='_blank'>Please visit this link to register.</a></p>
+<br />
+<p>Best regards,</p>
+<p>VCollab Dashboard Team</p>
+</div>"""
 
     params: resend.Emails.SendParams = {
         "from": "info@vcollab.ai",
