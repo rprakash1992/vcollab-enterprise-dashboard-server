@@ -94,6 +94,9 @@ oracle_tenancy_ocid = os.getenv("ORACLE_TENANCY_OCID")
 oracle_fingerprint = os.getenv("ORACLE_FINGERPRINT")
 oracle_region = os.getenv("ORACLE_REGION")
 
+download_single_file_from_zip_function_id = os.getenv("DOWNLOAD_SINGLE_FILE_FROM_ZIP_FUNCTION_ID")
+download_folder_from_zip_function_id = os.getenv("DOWNLOAD_FOLDER_FROM_ZIP_FUNCTION_ID")
+
 supabase_url: str = os.getenv("SUPABASE_URL")
 supabase_key: str = os.getenv("SUPABASE_KEY")
 service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -326,7 +329,8 @@ def download_file_from_zip(data: FileUrlData):
             "required_file": file_url
         }
 
-        function_id = "ocid1.fnfunc.oc1.ap-hyderabad-1.aaaaaaaalgowlems5cg55cb5qjrikzmsg5kuzag25g5fseno5qynuypd445q"
+        # function_id = "ocid1.fnfunc.oc1.ap-hyderabad-1.aaaaaaaalgowlems5cg55cb5qjrikzmsg5kuzag25g5fseno5qynuypd445q"
+        function_id = download_single_file_from_zip_function_id
         fn_mgmt_client = oci.functions.FunctionsManagementClient(config)
         fn_details = fn_mgmt_client.get_function(function_id=function_id).data
         fn_invoke = oci.functions.FunctionsInvokeClient(config)
@@ -405,7 +409,8 @@ def download_folder_from_zip(data: FolderUrlData):
             "required_folder": folder_url
         }
 
-        function_id = "ocid1.fnfunc.oc1.ap-hyderabad-1.aaaaaaaa6c3r5fqwknusewsazcm4khucwst5kvlmuvhgrmxgxuovxjfnaj2a"
+        # function_id = "ocid1.fnfunc.oc1.ap-hyderabad-1.aaaaaaaa6c3r5fqwknusewsazcm4khucwst5kvlmuvhgrmxgxuovxjfnaj2a"
+        function_id = download_folder_from_zip_function_id
         fn_mgmt_client = oci.functions.FunctionsManagementClient(config)
         fn_details = fn_mgmt_client.get_function(function_id=function_id).data
         fn_invoke = oci.functions.FunctionsInvokeClient(config)
