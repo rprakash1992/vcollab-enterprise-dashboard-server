@@ -11,10 +11,11 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import oci
 from oci.object_storage import ObjectStorageClient
-from oci.config import from_file, validate_config
+from oci.config import validate_config
 import ast
 import resend
 from supabase import create_client, Client
+import base64
 
 load_dotenv()
 
@@ -46,49 +47,23 @@ class RegisterRequestMailData(BaseModel):
     name: str
     email: str
 
-class SignUpData(BaseModel):
-    email: str
-    password: str
-
-class RegisterNewUserData(BaseModel):
-    name: str
-    email: str
-    password: str
-
-class EmailVerifyData(BaseModel):
-    name: str
-    email: str
-    userId: str
-
-class RegisterConfirmationMainData(BaseModel):
+class RegisterConfirmationMailData(BaseModel):
     email: str
     name: str
     type: str
-
-class UserProfileData(BaseModel):
-    name: str
-    email: str
 
 class InvitationEmailData(BaseModel):
     email: str
     itemName: str
     itemType: str
 
-class InvitedItemsObject(BaseModel):
-    itemId: int
-    invitedBy: str
-    role: int
-
-class InvitedUsersData(BaseModel):
-    email: str
-    invitedItems: List[InvitedItemsObject]
-
 class EmailData(BaseModel):
     email: str
 
 oracle_bucket = os.getenv("ORACLE_BUCKET")
 oracle_namespace = os.getenv("ORACLE_NAMESPACE")
-# oracle_private_key = os.getenv("ORACLE_PRIVATE_KEY")
+oracle_private_key_encoded = os.getenv("ORACLE_PRIVATE_KEY_ENCODED")
+oracle_private_key = base64.b64decode(oracle_private_key_encoded)
 oracle_user_ocid = os.getenv("ORACLE_USER_OCID")
 oracle_tenancy_ocid = os.getenv("ORACLE_TENANCY_OCID")
 oracle_fingerprint = os.getenv("ORACLE_FINGERPRINT")
@@ -108,33 +83,7 @@ resend.api_key = os.getenv("RESEND_ACCESS_KEY")
 
 config = {
     "user": oracle_user_ocid,
-    "key_content": """-----BEGIN RSA PRIVATE KEY-----
-MIIEpAIBAAKCAQEAy9a+x9e+618NMzOlS6QXI3hl2Fu2ZRe/A0zRV/OajI9OlzjN
-yRZZ5cgj6rkQCMycGC4OT+6wMiBwGQkEdvhHQ/DXKmAN2UKhhu6hxq7O2FpMXSrW
-hUiPPZAahQUCmrCaXjg9bQnAfTihKpwmPAdZ22W/Pv67/EBlaWnsFbX8g6iYPaCK
-NbRlF2nw6DR5XA0lVnvi4MIr/hx0omyxlsEHqVVHMNdip3Fo5vvKg/0mAkvtEfvL
-aja2iKALlncuUkzNheKaP7Xnc4TSitn8SJmX1RT4B4rQBY6CxX9G9TVY2/3B8Sho
-T+hun+zl46KMaHJY23hNYT3YGe6WATFWXJ3+jwIDAQABAoIBAAVT8p6km//o9x5c
-fjiQ7G3n6rmSBB12Vm7OpjYnTuXXpRU8zdwwsl7YMWAkQDAKsRXMtmEOexqEUInG
-+4/kg3BaLjWUVyhTnoc5W48m6I8tJQvWX88SC3RvfNH3RI8oiJBn5esgsyBSx5um
-gzVUd9vNOAd8fwtj34K22w3iONx0Er10MIT4RoQBijX3IlCr+z1L2XSYEEKFlLXe
-ymtyf01XIeWD/+9GpyxHhhsjx7/HiRcbIdsQ1cwsHbsAwIaWWHHlSVuEhDs+DgAG
-g0YGrYfS3uDqPUXwY5Ryn5//gDatH4bFGp3Ferj5lQAs9mG1qMQKoitAjU6feYaF
-EF69v3ECgYEA5fmuVe0fARlLuQ8DvGvD1DOabaYO0mTGMxPMMGwRZp9eepoxbPAt
-JvS2ZUF/z5wLsPZll9N6KXBkG+NKvlakjhvgcoGxpgl2lemk1H77+nxq0MZ266h9
-5u4MYOLP0rQd51HEFvE4JSJwtCMNTMr0fL2exsONY+ehZZbhAkrcpikCgYEA4ufl
-9CXLHk8b8a7YhfjCrgy/3qvnFHe8SuefHb/+kt2pzKQdJmTVmdSTpbiRh3u6gCi0
-ZSzTb81f95pLJOklLeSYAtvGbDES+5vmgKCGhFBinQya0CloQXOWwTckL00vemVQ
-FcKA/Q5AkbuB4wIP8kd8PY3jx4+Wi22ptpU/5fcCgYBmbGEcm9LnJmD3NpyvWj+J
-TsJEe2S2h3NOZE7Ycgj975SgffPtVLqHUw244wcNa645TkPI7sLFmey8DurHAsef
-EwNPfDumeyh5c+mZSkTnNmpMOVfVdOE97F9O9zUf3mBDGcN/hEdBIqmXUNUnkmx4
-8eq5E3bxO8RB/oSQBM9ooQKBgQC32ITs6KJGkHpnu+8bvY6fTx024bl9T/Z0Cm9V
-v3YYsRkfAenMbe7TkPWAVKc1Sv61UEW5pDQ8Zf7Xs2AnK/A/2vN/fWqrxqdGze5Z
-UbcsBaWg8dGNz771KR6AtpjO6o8JcIUO3GV+o8mVSoPW1pjtCRaVGR3xV1n25oeX
-tB3tyQKBgQCG7s5B5Ou3BlkQI52KlL9I6Mn1E0sJ2QGkk7YRd1MGrUbq1A/sgKd9
-11VMTHS+AezMcZ4EfdsdcOFBwqR8KnQEfonqZ3toQI5ECHb1k/vwe6CVCbcQCM1p
-6Ah6jrg+DN6SkpcnBxwkXt2rR2LCYSWMXyo6ennSS5lhd/XIjnnsaQ==
------END RSA PRIVATE KEY-----""",
+    "key_content": oracle_private_key,
     "fingerprint": oracle_fingerprint,
     "tenancy": oracle_tenancy_ocid,
     "region": oracle_region,
@@ -536,7 +485,7 @@ def register_request_mail_to_admin(data: RegisterRequestMailData):
         }
   
 @app.post("/register-confirmation-mail-to-user")
-def register_confirmation_mail_to_user(data: RegisterConfirmationMainData):
+def register_confirmation_mail_to_user(data: RegisterConfirmationMailData):
     email = data.email
     name = data.name
     type = data.type
