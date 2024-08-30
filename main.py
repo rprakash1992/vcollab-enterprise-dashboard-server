@@ -17,7 +17,7 @@ import resend
 from supabase import create_client, Client
 import base64
 
-load_dotenv()
+load_dotenv(".env.test")
 
 app = FastAPI()
 
