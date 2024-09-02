@@ -445,7 +445,7 @@ def register_request_mail_to_admin(data: RegisterRequestMailData):
 <p><b>Email: {email}</b></p>
 <br />
 <p>Kindly review the user’s profile and take any necessary administrative actions by visiting the admin panel.</p>
-<p><a href='https://dev.vcollab.ai/admin' target='_blank'>Click here to visit Admin Panel</a></p></div>"""
+<p><a href='https://test-dev.vcollab.ai/admin' target='_blank'>Click here to visit Admin Panel</a></p></div>"""
     }
     
     paramsToUser: resend.Emails.SendParams = {
@@ -506,7 +506,7 @@ def register_confirmation_mail_to_user(data: RegisterConfirmationMailData):
 <br />
 <p>We are excited to inform you that your registration request on VCollab Dashboard App has been successfully approved by the admin.</p>
 <p>You may login with your credentials now by visiting the link below.</p>
-<p><a href='https://dev.vcollab.ai/login' target='_blank'>Click here to Login</a></p>
+<p><a href='https://test-dev.vcollab.ai/login' target='_blank'>Click here to Login</a></p>
 <p>Welcome aboard, and enjoy your journey with us!</p>
 <br />
 <p>Best regards,</p>
@@ -553,7 +553,7 @@ def send_invitation_email(data: InvitationEmailData):
 <br />
 <p>You have been invited to access a {item_type}, <b>'{item_name}'</b> at VCollab Dashboard App.</p>
 <p>Please register at VCollab Dashboard App to access the {item_type}.<p>
-<p><a href='http://dev.vcollab.ai/register' target='_blank'>Please visit this link to register.</a></p>
+<p><a href='http://test-dev.vcollab.ai/register' target='_blank'>Please visit this link to register.</a></p>
 <br />
 <p>Best regards,</p>
 <p>VCollab Dashboard Team</p>
