@@ -80,7 +80,8 @@ app_name: str = os.getenv("APP_NAME")
 app_domain: str = os.getenv("APP_DOMAIN")
 admin_domain: str = os.getenv("ADMIN_DOMAIN")
 app_email: str = os.getenv("APP_EMAIL")
-admin_emails: str = os.getenv("ADMIN_EMAILS").split(",")
+admin_emails_str: str = os.getenv("ADMIN_EMAILS") or ""
+admin_emails = admin_emails_str.split(",")
 
 supabase: Client = create_client(supabase_url, supabase_key)
 supabase_admin = create_client(supabase_url, service_role_key)
