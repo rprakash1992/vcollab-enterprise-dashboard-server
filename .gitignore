@@ -31,5 +31,6 @@ archive.zip
 .DS_Store
 
 main-for-aws.py
+main_copy.py
 
 oci-functions

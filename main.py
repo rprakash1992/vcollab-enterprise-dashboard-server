@@ -14,8 +14,8 @@ from oci.object_storage import ObjectStorageClient
 from oci.config import validate_config
 import ast
 import resend
-from supabase import create_client, Client
 import base64
+from config.keys import APP_NAME, APP_DOMAIN, ADMIN_DOMAIN, APP_EMAIL, ADMIN_EMAILS 
 
 load_dotenv(".env.test")
 
@@ -60,7 +60,7 @@ class InvitationEmailData(BaseModel):
 class EmailData(BaseModel):
     email: str
 
-oracle_bucket = os.getenv("ORACLE_BUCKET")
+oracle_bucket = os.getenv("ORACLE_BUCKET_DEV")
 oracle_namespace = os.getenv("ORACLE_NAMESPACE")
 oracle_private_key_encoded = os.getenv("ORACLE_PRIVATE_KEY_ENCODED")
 oracle_private_key = base64.b64decode(oracle_private_key_encoded)
@@ -69,22 +69,14 @@ oracle_tenancy_ocid = os.getenv("ORACLE_TENANCY_OCID")
 oracle_fingerprint = os.getenv("ORACLE_FINGERPRINT")
 oracle_region = os.getenv("ORACLE_REGION")
 
-download_single_file_from_zip_function_id = os.getenv("DOWNLOAD_SINGLE_FILE_FROM_ZIP_FUNCTION_ID")
-download_folder_from_zip_function_id = os.getenv("DOWNLOAD_FOLDER_FROM_ZIP_FUNCTION_ID")
+download_single_file_from_zip_function_id = os.getenv("DOWNLOAD_SINGLE_FILE_FROM_ZIP_FUNCTION_ID_DEV")
+download_folder_from_zip_function_id = os.getenv("DOWNLOAD_FOLDER_FROM_ZIP_FUNCTION_ID_DEV")
 
-supabase_url: str = os.getenv("SUPABASE_URL")
-supabase_key: str = os.getenv("SUPABASE_KEY")
-service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
-app_name: str = os.getenv("APP_NAME")
-app_domain: str = os.getenv("APP_DOMAIN")
-admin_domain: str = os.getenv("ADMIN_DOMAIN")
-app_email: str = os.getenv("APP_EMAIL")
-admin_emails_str: str = os.getenv("ADMIN_EMAILS") or ""
-admin_emails = admin_emails_str.split(",")
-
-supabase: Client = create_client(supabase_url, supabase_key)
-supabase_admin = create_client(supabase_url, service_role_key)
+app_name: str = APP_NAME
+app_domain: str = APP_DOMAIN
+admin_domain: str = ADMIN_DOMAIN
+app_email: str = APP_EMAIL
+admin_emails = ADMIN_EMAILS
 
 resend.api_key = os.getenv("RESEND_ACCESS_KEY")
 
@@ -594,28 +586,28 @@ def send_invitation_email(data: InvitationEmailData):
             "errorMessage": str(e)
         }
     
-@app.post("/get-user-id-from-email")
-def get_user_id_from_email(data: EmailData):
-    email = data.email
+# @app.post("/get-user-id-from-email")
+# def get_user_id_from_email(data: EmailData):
+#     email = data.email
     
-    try:
-        req_user = ""
-        users_list = supabase_admin.auth.admin.list_users()
+#     try:
+#         req_user = ""
+#         users_list = supabase_admin.auth.admin.list_users()
 
-        for user in users_list:
-            if user.email == email:
-                req_user = user
+#         for user in users_list:
+#             if user.email == email:
+#                 req_user = user
 
-        return {
-            "success": True,
-            "message": "",
-            "data": req_user.id
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "errorMessage": str(e)
-        }
+#         return {
+#             "success": True,
+#             "message": "",
+#             "data": req_user.id
+#         }
+#     except Exception as e:
+#         return {
+#             "success": False,
+#             "errorMessage": str(e)
+#         }
 
 def fetch(key_name, start, len):
     """
