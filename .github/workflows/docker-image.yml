@@ -17,8 +17,8 @@ jobs:
     - name: Build Docker image
       run: |
         docker build \
-        -t ap-hyderabad-1.ocir.io/axpgfm9lqlof/vcollab-repo/vcollab-dashboard-server:latest .
+        -t ap-hyderabad-1.ocir.io/axpgfm9lqlof/vcollab-test-repo/vcollab-dashboard-server:latest .
 
     - name: Push Docker image to OCI
       run: |
-        docker push ap-hyderabad-1.ocir.io/axpgfm9lqlof/vcollab-repo/vcollab-dashboard-server:latest
+        docker push ap-hyderabad-1.ocir.io/axpgfm9lqlof/vcollab-test-repo/vcollab-dashboard-server:latest
