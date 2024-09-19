@@ -15,9 +15,12 @@ from oci.config import validate_config
 import ast
 import resend
 import base64
-from config.keys import APP_NAME, APP_DOMAIN, ADMIN_DOMAIN, APP_EMAIL, ADMIN_EMAILS 
+from keys import APP_NAME, APP_DOMAIN, ADMIN_DOMAIN, APP_EMAIL, ADMIN_EMAILS 
 
-load_dotenv(".env.test")
+env = os.getenv("ENVIRONMENT")
+
+if env == "development":
+    load_dotenv(".env.test")
 
 app = FastAPI()
 
@@ -60,7 +63,7 @@ class InvitationEmailData(BaseModel):
 class EmailData(BaseModel):
     email: str
 
-oracle_bucket = os.getenv("ORACLE_BUCKET_DEV")
+oracle_bucket = os.getenv("ORACLE_BUCKET")
 oracle_namespace = os.getenv("ORACLE_NAMESPACE")
 oracle_private_key_encoded = os.getenv("ORACLE_PRIVATE_KEY_ENCODED")
 oracle_private_key = base64.b64decode(oracle_private_key_encoded)
@@ -69,8 +72,8 @@ oracle_tenancy_ocid = os.getenv("ORACLE_TENANCY_OCID")
 oracle_fingerprint = os.getenv("ORACLE_FINGERPRINT")
 oracle_region = os.getenv("ORACLE_REGION")
 
-download_single_file_from_zip_function_id = os.getenv("DOWNLOAD_SINGLE_FILE_FROM_ZIP_FUNCTION_ID_DEV")
-download_folder_from_zip_function_id = os.getenv("DOWNLOAD_FOLDER_FROM_ZIP_FUNCTION_ID_DEV")
+download_single_file_from_zip_function_id = os.getenv("DOWNLOAD_SINGLE_FILE_FROM_ZIP_FUNCTION_ID")
+download_folder_from_zip_function_id = os.getenv("DOWNLOAD_FOLDER_FROM_ZIP_FUNCTION_ID")
 
 app_name: str = APP_NAME
 app_domain: str = APP_DOMAIN
