@@ -1,0 +1,24 @@
+name: Build and Push Docker Image to OCI
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Log in to OCI Container Registry
+      run: |
+        echo "${{ secrets.OCI_AUTH_TOKEN }}" | docker login -u "axpgfm9lqlof/ravi.prakash@vcollab.com" --password-stdin https://ap-hyderabad-1.ocir.io
+
+    - name: Build Docker image
+      run: |
+        docker build \
+        -t ap-hyderabad-1.ocir.io/axpgfm9lqlof/vcollab-repo/vcollab-dashboard-server:latest .
+
+    - name: Push Docker image to OCI
+      run: |
+        docker push ap-hyderabad-1.ocir.io/axpgfm9lqlof/vcollab-repo/vcollab-dashboard-server:latest
