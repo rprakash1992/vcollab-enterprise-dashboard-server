@@ -1,4 +1,5 @@
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, UploadFile, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from io import BytesIO
@@ -33,6 +34,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Set a higher limit for the request body size (in bytes)
+MAX_PAYLOAD_SIZE = 100 * 1024 * 1024 * 1024  # 100GB, adjust this according to your requirement
+
+@app.middleware("http")
+async def limit_request_size(request: Request, call_next):
+    if int(request.headers.get("content-length", 0)) > MAX_PAYLOAD_SIZE:
+        return JSONResponse(content={"message": "File too large"}, status_code=413)
+    return await call_next(request)
 
 class Data(BaseModel):
     fileName: str
