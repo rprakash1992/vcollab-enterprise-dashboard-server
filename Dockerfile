@@ -1,16 +1,36 @@
-FROM python:3.12
+# Dockerfile
+# Step 1: Build the React app
+FROM node:18 AS build
 
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# Set the working directory
+WORKDIR /app
 
-WORKDIR /app/
+# Copy package.json and package-lock.json for npm install
+COPY package*.json ./
 
-COPY requirements.txt .
+# Install dependencies
+RUN npm install
 
-RUN pip install -r requirements.txt
+# Copy the rest of the app
+COPY . .
 
-COPY main.py .
+# Build the React app
+RUN npm run build
 
-COPY keys.py .
+# Step 2: Serve the app with serve -s build
+FROM node:18 AS production
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Install 'serve' globally
+RUN npm install -g serve
+
+# Set the working directory in the new container
+WORKDIR /app
+
+# Copy the built app from the previous stage
+COPY --from=build /app/build ./build
+
+# Expose port 8080
+EXPOSE 8080
+
+# Use the 'serve' command to serve the app in production
+CMD ["serve", "-s", "build", "-l", "8080"]

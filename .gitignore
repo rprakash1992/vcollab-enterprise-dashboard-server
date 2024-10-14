@@ -34,3 +34,10 @@ main-for-aws.py
 main_copy.py
 
 oci-functions
+
+/node
+/node_modules
+keys_original.py
+main_original.py
+requirements_original.txt
+Dockerfile_original
