@@ -26,8 +26,14 @@ const {
   adminEmails,
   oracleNamespace,
   oracleBucket,
+  oracleUserOcid,
+  oracleTenancyOcid,
+  oracleFingerprint,
+  oracleRegion,
+  oraclePrivateKeyEncoded,
 } = require("../config/keys");
 
+// const storage = multer.memoryStorage();
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/'); // Specify the directory to store files temporarily
@@ -37,9 +43,21 @@ const storage = multer.diskStorage({
   },
 });
 
-// const storage = multer.memoryStorage();
+let oraclePrivateKeyEncodedBuffer = Buffer.from(oraclePrivateKeyEncoded, "base64");
+// Encode the Buffer as a utf8 string
+let oraclePrivateKey = oraclePrivateKeyEncodedBuffer.toString("utf-8");
 
-const provider = new common.ConfigFileAuthenticationDetailsProvider();
+// const provider = new common.ConfigFileAuthenticationDetailsProvider();
+const region = common.Region.register("ap-hyderabad-1",  common.Realm.OC1, "hyd")
+const provider = new common.SimpleAuthenticationDetailsProvider(
+  oracleTenancyOcid,
+  oracleUserOcid,
+  oracleFingerprint,
+  oraclePrivateKey,
+  null,
+  region,
+);
+
 const upload = multer({
   storage,
   limits: {
@@ -58,13 +76,13 @@ const client = new objectstorage.ObjectStorageClient({
   authenticationDetailsProvider: provider,
 });
 
-const generateStreamFromString = (data) => {
-  let Readable = require("stream").Readable;
-  let stream = new Readable();
-  stream.push(data); // the string you want
-  stream.push(null);
-  return stream;
-};
+// const generateStreamFromString = (data) => {
+//   let Readable = require("stream").Readable;
+//   let stream = new Readable();
+//   stream.push(data); // the string you want
+//   stream.push(null);
+//   return stream;
+// };
 
 router.post("/upload-normal-file", upload.single("file"), async (req, res) => {
   const { file } = req;
