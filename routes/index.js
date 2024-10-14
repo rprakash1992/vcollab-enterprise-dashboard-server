@@ -8,6 +8,9 @@ const common = require("oci-common");
 // const stream = require("stream");
 const uuid = require("uuid");
 const AdmZip = require("adm-zip");
+const fs = require('fs');
+const path = require('path');
+const StreamZip = require('node-stream-zip');
 // const fn = require("oci-functions");
 // const helper = require("oci-common/lib/helper");
 // var encoding = require("encoding-japanese");
@@ -25,13 +28,29 @@ const {
   oracleBucket,
 } = require("../config/keys");
 
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/'); // Specify the directory to store files temporarily
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.originalname);
+  },
+});
+
+// const storage = multer.memoryStorage();
+
 const provider = new common.ConfigFileAuthenticationDetailsProvider();
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage,
   limits: {
     fileSize: 100 * 1024 * 1024 * 1024, // 100 GB
   },
 });
+
+// Create uploads directory if it doesn't exist
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
 
 const router = express.Router();
 const resend = new Resend(resendAccessKey);
@@ -49,22 +68,29 @@ const generateStreamFromString = (data) => {
 
 router.post("/upload-normal-file", upload.single("file"), async (req, res) => {
   const { file } = req;
+
+  const tempFilePath = file?.path;
   const fileName = file?.originalname;
   const fileExtensionIndex = fileName?.lastIndexOf(".");
   const fileExtension = fileName?.slice(fileExtensionIndex);
   const uniqueName = String(uuid.v4() + fileExtension);
+
+  // Read the file from the temporary location
+  const fileStream = fs.createReadStream(tempFilePath);
 
   const putObjectRequest = {
     namespaceName: oracleNamespace,
     bucketName: oracleBucket,
     objectName: uniqueName,
     contentLength: file?.size,
-    putObjectBody: generateStreamFromString(file?.buffer),
+    putObjectBody: fileStream,
     contentType: file?.mimetype,
   };
 
   try {
     await client.putObject(putObjectRequest);
+
+    fs.unlinkSync(tempFilePath);
 
     res.json({
       success: true,
@@ -72,6 +98,7 @@ router.post("/upload-normal-file", upload.single("file"), async (req, res) => {
       data: [uniqueName],
     });
   } catch (err) {
+    console.log(err)
     res.json({
       success: false,
       errorMessage: String(err),
@@ -84,29 +111,48 @@ router.post("/upload-zip-file", upload.single("file"), async (req, res) => {
     const { file } = req;
     uniqueName = String(uuid.v4()) + ".zip";
 
+    const tempFilePath = file?.path;
+    const fileStream = fs.createReadStream(tempFilePath);
+
     const putObjectRequest = {
       namespaceName: oracleNamespace,
       bucketName: oracleBucket,
       objectName: uniqueName,
       contentLength: file.size,
-      putObjectBody: generateStreamFromString(file.buffer),
+      putObjectBody: fileStream,
       contentType: file.mimetype,
     };
 
     await client.putObject(putObjectRequest);
 
     const fileNamesList = [uniqueName];
-    const zipFile = new AdmZip(file?.buffer);
-    const entries = zipFile.getEntries();
-
-    entries.forEach((entry) => {
-      fileNamesList.push(entry?.entryName);
+    const zip = new StreamZip({
+      file: tempFilePath,
+      storeEntries: true
     });
+  
+    zip.on('ready', () => {
+      // Take a look at the files
+      console.log('Entries read: ' + zip.entriesCount);
+      for (const entry of Object.values(zip.entries())) {
+          // const desc = entry.isDirectory ? 'directory' : `${entry.size} bytes`;
+          // console.log(`Entry ${entry.name}: ${desc}`);
+          fileNamesList.push(entry?.name);
+      }
 
-    res.json({
-      success: true,
-      message: "File uploaded successfully",
-      data: fileNamesList,
+  
+      // Read a file in memory
+      // let zipDotTxtContents = zip.entryDataSync('path/inside/zip.txt').toString('utf8');
+      // console.log("The content of path/inside/zip.txt is: " + zipDotTxtContents);
+  
+      // Do not forget to close the file once you're done
+      zip.close()
+      fs.unlinkSync(tempFilePath);
+      res.json({
+        success: true,
+        message: "File uploaded successfully",
+        data: fileNamesList,
+      });
     });
   } catch (err) {
     return {
@@ -115,6 +161,117 @@ router.post("/upload-zip-file", upload.single("file"), async (req, res) => {
     };
   }
 });
+
+// router.post("/upload-zip-file", upload.single("file"), async (req, res) => {
+//   try {
+//     const { file } = req;
+//     uniqueName = String(uuid.v4()) + ".zip";
+
+//     const tempFilePath = file?.path;
+//     const fileStream = fs.createReadStream(tempFilePath);
+
+//     const putObjectRequest = {
+//       namespaceName: oracleNamespace,
+//       bucketName: oracleBucket,
+//       objectName: uniqueName,
+//       contentLength: file.size,
+//       putObjectBody: fileStream,
+//       contentType: file.mimetype,
+//     };
+
+//     await client.putObject(putObjectRequest);
+
+//     const fileNamesList = [uniqueName];
+//     const zipFile = new AdmZip(tempFilePath);
+//     const entries = zipFile.getEntries();
+
+//     entries.forEach((entry) => {
+//       fileNamesList.push(entry?.entryName);
+//     });
+
+//     fs.unlinkSync(tempFilePath);
+
+//     res.json({
+//       success: true,
+//       message: "File uploaded successfully",
+//       data: fileNamesList,
+//     });
+//   } catch (err) {
+//     return {
+//       success: false,
+//       errorMessage: String(err),
+//     };
+//   }
+// });
+
+// router.post("/upload-normal-file", upload.single("file"), async (req, res) => {
+//   const { file } = req;
+//   const fileName = file?.originalname;
+//   const fileExtensionIndex = fileName?.lastIndexOf(".");
+//   const fileExtension = fileName?.slice(fileExtensionIndex);
+//   const uniqueName = String(uuid.v4() + fileExtension);
+
+//   const putObjectRequest = {
+//     namespaceName: oracleNamespace,
+//     bucketName: oracleBucket,
+//     objectName: uniqueName,
+//     contentLength: file?.size,
+//     putObjectBody: generateStreamFromString(file?.buffer),
+//     contentType: file?.mimetype,
+//   };
+
+//   try {
+//     await client.putObject(putObjectRequest);
+
+//     res.json({
+//       success: true,
+//       message: "File uploaded successfully",
+//       data: [uniqueName],
+//     });
+//   } catch (err) {
+//     res.json({
+//       success: false,
+//       errorMessage: String(err),
+//     });
+//   }
+// });
+
+// router.post("/upload-zip-file", upload.single("file"), async (req, res) => {
+//   try {
+//     const { file } = req;
+//     uniqueName = String(uuid.v4()) + ".zip";
+
+//     const putObjectRequest = {
+//       namespaceName: oracleNamespace,
+//       bucketName: oracleBucket,
+//       objectName: uniqueName,
+//       contentLength: file.size,
+//       putObjectBody: generateStreamFromString(file.buffer),
+//       contentType: file.mimetype,
+//     };
+
+//     await client.putObject(putObjectRequest);
+
+//     const fileNamesList = [uniqueName];
+//     const zipFile = new AdmZip(file?.buffer);
+//     const entries = zipFile.getEntries();
+
+//     entries.forEach((entry) => {
+//       fileNamesList.push(entry?.entryName);
+//     });
+
+//     res.json({
+//       success: true,
+//       message: "File uploaded successfully",
+//       data: fileNamesList,
+//     });
+//   } catch (err) {
+//     return {
+//       success: false,
+//       errorMessage: String(err),
+//     };
+//   }
+// });
 
 router.post("/download-file", async (req, res) => {
   try {
