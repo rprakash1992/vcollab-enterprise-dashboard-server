@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+resend
+oci
+python-dotenv
+python-multipart
