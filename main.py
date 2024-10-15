@@ -108,7 +108,6 @@ object_storage = ObjectStorageClient(config)
 
 @app.post('/getPresignedUrl')
 def get_presigned_url(data: Data):
-    print("helloooo")
     try:
         filename = data.fileName
         current_time = datetime.now()
