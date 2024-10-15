@@ -46,5 +46,5 @@ Dockerfile_node
 /routes_node
 /config_node
 server_node.js
-package.json
-package-lock.json
+package_node.json
+package-lock_node.json
