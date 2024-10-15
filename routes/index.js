@@ -8,9 +8,11 @@ const common = require("oci-common");
 // const stream = require("stream");
 const uuid = require("uuid");
 const AdmZip = require("adm-zip");
-const fs = require('fs');
-const path = require('path');
-const StreamZip = require('node-stream-zip');
+const fs = require("fs");
+const path = require("path");
+const StreamZip = require("node-stream-zip");
+const JSZip = require("jszip");
+const { Readable } = require("stream");
 // const fn = require("oci-functions");
 // const helper = require("oci-common/lib/helper");
 // var encoding = require("encoding-japanese");
@@ -36,26 +38,33 @@ const {
 // const storage = multer.memoryStorage();
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // Specify the directory to store files temporarily
+    cb(null, "uploads/"); // Specify the directory to store files temporarily
   },
   filename: (req, file, cb) => {
     cb(null, file.originalname);
   },
 });
 
-let oraclePrivateKeyEncodedBuffer = Buffer.from(oraclePrivateKeyEncoded, "base64");
+let oraclePrivateKeyEncodedBuffer = Buffer.from(
+  oraclePrivateKeyEncoded,
+  "base64"
+);
 // Encode the Buffer as a utf8 string
 let oraclePrivateKey = oraclePrivateKeyEncodedBuffer.toString("utf-8");
 
 // const provider = new common.ConfigFileAuthenticationDetailsProvider();
-const region = common.Region.register("ap-hyderabad-1",  common.Realm.OC1, "hyd")
+const region = common.Region.register(
+  "ap-hyderabad-1",
+  common.Realm.OC1,
+  "hyd"
+);
 const provider = new common.SimpleAuthenticationDetailsProvider(
   oracleTenancyOcid,
   oracleUserOcid,
   oracleFingerprint,
   oraclePrivateKey,
   null,
-  region,
+  region
 );
 
 const upload = multer({
@@ -66,8 +75,8 @@ const upload = multer({
 });
 
 // Create uploads directory if it doesn't exist
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
 }
 
 const router = express.Router();
@@ -83,6 +92,142 @@ const client = new objectstorage.ObjectStorageClient({
 //   stream.push(null);
 //   return stream;
 // };
+
+router.post("/getPresignedUrl", async (req, res) => {
+  const { fileName } = req.body;
+
+  try {
+    // Generate pre-signed URL for PUT operation
+    const presignedUrl = await generatePresignedUrl(fileName);
+    res.status(200).json({ presignedUrl });
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to generate pre-signed URL",
+      details: error.message,
+    });
+  }
+});
+
+async function generatePresignedUrl(fileName) {
+  const objectName = path.basename(fileName);
+  // const getObjectRequest = new GetObjectRequest({
+  //   bucketName: config.bucketName,
+  //   objectName
+  // });
+
+  const createPreauthenticatedRequestDetails = {
+    name: "EXAMPLE-name-Value",
+    // bucketListingAction: objectstorage.requests.PreauthenticatedRequest.BucketListingAction.putObject,
+    objectName,
+    accessType:
+      objectstorage.models.CreatePreauthenticatedRequestDetails.AccessType
+        .ObjectWrite,
+    timeExpires: new Date("Thu Jul 16 17:46:56 UTC 2025"),
+  };
+
+  const createPreauthenticatedRequestRequest = {
+    namespaceName: oracleNamespace,
+    bucketName: oracleBucket,
+    createPreauthenticatedRequestDetails: createPreauthenticatedRequestDetails,
+    // opcClientRequestId: "ocid1.test.oc1..<unique_ID>EXAMPLE-opcClientRequestId-Value",
+  };
+
+  const preSignedUrl = await client.createPreauthenticatedRequest(
+    createPreauthenticatedRequestRequest
+  );
+
+  return preSignedUrl;
+}
+
+function convertBytesToInt(bytes) {
+  let val = bytes[0] + (bytes[1] << 8);
+  
+  if (bytes.length > 3) {
+      val += (bytes[2] << 16) + (bytes[3] << 24);
+  }
+  
+  return val;
+}
+
+// async function fetch (key, start, len) {
+//   const end = start + 22 - 1;
+
+//   const getObjectRequest = {
+//     namespaceName: oracleNamespace,
+//     bucketName: oracleBucket,
+//     objectName: "e35bcea9-b5af-4842-8152-41ab58d3a1c1.zip",
+//     range: common.Range.parse(`${start}-${end}/${size}`),
+//   };
+
+//   const getObjectResponse = await client.getObject(getObjectRequest);
+
+//   return getObjectResponse?.value;
+// }
+
+async function fetch (objectName, start, end, size) {
+  console.log("start", start)
+  console.log("end", end)
+  console.log("size", size)
+  const getObjectRequest = {
+    namespaceName: oracleNamespace,
+    bucketName: oracleBucket,
+    objectName,
+    range: common.Range.parse(`${start}-${end}/${size}`),
+  };
+
+  const getObjectResponse = await client.getObject(getObjectRequest);
+  return getObjectResponse?.value;
+}
+
+function parseInt(bytes) {
+  let val = bytes[0] + (bytes[1] << 8);
+  if (bytes.length > 3) {
+      val += (bytes[2] << 16) + (bytes[3] << 24);
+  }
+  return val;
+}
+
+router.get("/list-zip-files", async (req, res) => {
+  const objectName = "e35bcea9-b5af-4842-8152-41ab58d3a1c1.zip";
+  try {
+    const headObjectRequest = {
+      namespaceName: oracleNamespace,
+      bucketName: oracleBucket,
+      objectName: "e35bcea9-b5af-4842-8152-41ab58d3a1c1.zip",
+    };
+
+    const headObjectResponse = await client.headObject(headObjectRequest);
+    const size = headObjectResponse?.contentLength;
+
+    const start = size - 22;
+    const end = start + 22 - 1;
+    // const getObjectRequest = {
+    //   namespaceName: oracleNamespace,
+    //   bucketName: oracleBucket,
+    //   objectName: "e35bcea9-b5af-4842-8152-41ab58d3a1c1.zip",
+    //   range: common.Range.parse(`${start}-${end}/${size}`),
+    // };
+
+    // const getObjectResponse = await client.getObject(getObjectRequest);
+    const eocd = await fetch(objectName, start, end, size);
+    console.log("KJDbjjvbhdbsj")
+    // console.log(eocd)
+    const cdStart = parseInt(eocd.slice(16, 20));
+    const cdSize = parseInt(eocd.slice(12, 16));
+
+    const centralDirectory = await fetch(uniqueName, size - cdSize, size - cdSize + cdSize - 1, size);
+    console.log(centralDirectory)
+    // 6. Combine the central directory with the EOCD
+    const zipBuffer = Buffer.concat([centralDirectory, eocd]);
+
+    // 7. Extract file names from the ZIP archive
+    const zip = new AdmZip(zipBuffer);
+    res.json({ data: eocd });
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ error: "Failed to get file list" });
+  }
+});
 
 router.post("/upload-normal-file", upload.single("file"), async (req, res) => {
   const { file } = req;
@@ -116,7 +261,7 @@ router.post("/upload-normal-file", upload.single("file"), async (req, res) => {
       data: [uniqueName],
     });
   } catch (err) {
-    console.log(err)
+    console.log(err);
     res.json({
       success: false,
       errorMessage: String(err),
@@ -141,30 +286,29 @@ router.post("/upload-zip-file", upload.single("file"), async (req, res) => {
       contentType: file.mimetype,
     };
 
-    await client.putObject(putObjectRequest);
+    // await client.putObject(putObjectRequest);
 
     const fileNamesList = [uniqueName];
     const zip = new StreamZip({
       file: tempFilePath,
-      storeEntries: true
+      storeEntries: true,
     });
-  
-    zip.on('ready', () => {
+
+    zip.on("ready", () => {
       // Take a look at the files
-      console.log('Entries read: ' + zip.entriesCount);
+      console.log("Entries read: " + zip.entriesCount);
       for (const entry of Object.values(zip.entries())) {
-          // const desc = entry.isDirectory ? 'directory' : `${entry.size} bytes`;
-          // console.log(`Entry ${entry.name}: ${desc}`);
-          fileNamesList.push(entry?.name);
+        // const desc = entry.isDirectory ? 'directory' : `${entry.size} bytes`;
+        // console.log(`Entry ${entry.name}: ${desc}`);
+        fileNamesList.push(entry?.name);
       }
 
-  
       // Read a file in memory
       // let zipDotTxtContents = zip.entryDataSync('path/inside/zip.txt').toString('utf8');
       // console.log("The content of path/inside/zip.txt is: " + zipDotTxtContents);
-  
+
       // Do not forget to close the file once you're done
-      zip.close()
+      zip.close();
       fs.unlinkSync(tempFilePath);
       res.json({
         success: true,
