@@ -36,13 +36,13 @@ app.add_middleware(
 )
 
 # Set a higher limit for the request body size (in bytes)
-MAX_PAYLOAD_SIZE = 100 * 1024 * 1024 * 1024  # 100GB, adjust this according to your requirement
+# MAX_PAYLOAD_SIZE = 100 * 1024 * 1024 * 1024  # 100GB, adjust this according to your requirement
 
-@app.middleware("http")
-async def limit_request_size(request: Request, call_next):
-    if int(request.headers.get("content-length", 0)) > MAX_PAYLOAD_SIZE:
-        return JSONResponse(content={"message": "File too large"}, status_code=413)
-    return await call_next(request)
+# @app.middleware("http")
+# async def limit_request_size(request: Request, call_next):
+#     if int(request.headers.get("content-length", 0)) > MAX_PAYLOAD_SIZE:
+#         return JSONResponse(content={"message": "File too large"}, status_code=413)
+#     return await call_next(request)
 
 class Data(BaseModel):
     fileName: str
@@ -105,6 +105,91 @@ config = {
 validate_config(config)
 
 object_storage = ObjectStorageClient(config)
+
+@app.post('/getPresignedUrl')
+def get_presigned_url(data: Data):
+    try:
+        filename = data.fileName
+        current_time = datetime.now()
+        # Define the time delta for 15 minutes
+        time_delta = timedelta(minutes=15)
+
+        # Calculate the future time
+        future_time = current_time + time_delta
+        formatted_future_time = future_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+                
+        response = object_storage.create_preauthenticated_request(
+            namespace_name=oracle_namespace,
+            bucket_name=oracle_bucket,
+            create_preauthenticated_request_details=oci.object_storage.models.CreatePreauthenticatedRequestDetails(
+                name="EXAMPLE-name-Value",
+                access_type="ObjectWrite",
+                time_expires=formatted_future_time,
+                object_name=filename
+            )
+        )
+        
+        return {
+            "success": True,
+            "message": "Presigned url created successfully",
+            "data": response
+        }
+    except Exception as e:
+        print(e)
+        return {
+            "success": False,
+            "errorMessage": str(e)
+        }
+        
+@app.post("/get-file-list")
+def upload_zip_file(data: Data):
+    try:
+        filename = data.fileName
+        
+        response = object_storage.head_object(
+            namespace_name=oracle_namespace,
+            bucket_name=oracle_bucket,
+            object_name=filename,
+        )
+
+        responseHeaders = response.headers
+        size = int(responseHeaders['Content-Length'])
+
+        eocd = fetch(filename, size - 22, 22)
+        # start offset and size of the central directory
+        cd_start = parse_int(eocd[16:20])
+        cd_size = parse_int(eocd[12:16])
+
+        cd = fetch(filename, cd_start, cd_size)
+
+        zip = ZipFile(BytesIO(cd + eocd))
+
+        file_names_list = []
+        file_names_list.append(filename)
+
+        for entry in zip.filelist:
+            f_name = entry.filename
+
+            # remove "/" from the end of filename
+            if f_name[len(f_name) - 1] == "/":
+                f_name = f_name[:len(f_name) - 1]
+                file_names_list.append(f_name)
+            # elif f_name.index("/")
+            else:
+                file_names_list.append(f_name)
+
+        return {
+            "success": True,
+            "message": "File list fetched successfully",
+            "data": file_names_list
+        }
+    
+    except Exception as e:
+        print(e)
+        return {
+            "success": False,
+            "errorMessage": str(e)
+        }
 
 @app.post("/upload-normal-file")
 def upload_normal_file(file: UploadFile):
